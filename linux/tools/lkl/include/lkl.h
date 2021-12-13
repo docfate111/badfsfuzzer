@@ -367,6 +367,9 @@ struct lkl_disk {
 		void *handle;
 	};
 	struct lkl_dev_blk_ops *ops;
+	// janus added:
+  	void *buffer;
+  	unsigned long long capacity;
 };
 
 /**

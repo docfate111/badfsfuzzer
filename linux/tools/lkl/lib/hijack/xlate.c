@@ -7,7 +7,7 @@
 #undef st_mtime
 #undef st_ctime
 #include <lkl.h>
-
+#include <linux/sockios.h>
 #include "xlate.h"
 
 long lkl_set_errno(long err)

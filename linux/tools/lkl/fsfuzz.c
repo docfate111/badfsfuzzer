@@ -260,8 +260,8 @@ void *userfault_init(void *image_buffer, size_t size) {
   return buffer;
 }
 
-extern void __afl_manual_init(void **buffer, size_t *size);
-extern uint32_t __afl_in_trace;
+//extern void __afl_manual_init(void **buffer, size_t *size);
+//extern uint32_t __afl_in_trace;
 // extern void output_edges(void);
 
 int main(int argc, char **argv)
@@ -293,9 +293,9 @@ int main(int argc, char **argv)
     mount_options = "errors=remount-ro";
 
   if (!cla.fsimg_path) {
-    __afl_manual_init(&image_buffer, &size); 
+    //__afl_manual_init(&image_buffer, &size); 
   } else {
-    __afl_manual_init(NULL, NULL);
+    //__afl_manual_init(NULL, NULL);
     lstat(cla.fsimg_path, &st); 
     int fd = open(cla.fsimg_path, O_RDWR);
     image_buffer = mmap(0, st.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
@@ -304,8 +304,8 @@ int main(int argc, char **argv)
   }
 
   disk.ops = NULL;
-  disk.buffer = userfault_init(image_buffer, size);
-  disk.capacity = size;
+  /*disk.buffer = userfault_init(image_buffer, size);
+  disk.capacity = size;*/
 
   ret = lkl_disk_add(&disk);
   if (ret < 0) {
@@ -316,7 +316,7 @@ int main(int argc, char **argv)
 
   lkl_start_kernel(&lkl_host_ops, "mem=128M");
 
-  __afl_in_trace = 1;  
+  //__afl_in_trace = 1;
 
   ret = lkl_mount_dev(disk_id, cla.part, cla.fsimg_type, 0,
 			                mount_options, mpoint, sizeof(mpoint));
@@ -329,7 +329,7 @@ int main(int argc, char **argv)
 
   ret = lkl_umount_dev(disk_id, cla.part, 0, 1000);
 
-  __afl_in_trace = 0;
+  //__afl_in_trace = 0;
 
 disk_remove:
   lkl_disk_remove(disk);
