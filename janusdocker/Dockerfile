@@ -1,12 +1,24 @@
-FROM ubuntu:xenial
-ENV LLVM_CONFIG=llvm-config-6.0
-RUN apt update -y && apt install -y make xz-utils wget bison flex g++ bc git cmake python && \
-	wget https://releases.llvm.org/6.0.0/cfe-6.0.0.src.tar.xz && \
-	wget https://releases.llvm.org/6.0.0/llvm-6.0.0.src.tar.xz && \
-	tar xJf cfe-6.0.0.src.tar.xz && tar xJf llvm-6.0.0.src.tar.xz && rm *xz && \
-	cd cfe-6.0.0.src && mkdir build && cd build && cmake ../../llvm-6.0.0.src/ && \
-	cmake -j8 --build .
-#g++ libboost-dev && \
-#    git clone https://github.com/sslab-gatech/janus.git && \ 
-#	cd janus/ff-gcc && make && cd ../core  && make && \
-#	cd ../lkl && ./compile -t btrfs -c && \
+FROM rsmmr/clang:6.0
+
+# Setup environment.
+ENV PATH /opt/clang/bin:$PATH
+
+# Default command on startup.
+CMD bash
+
+# Setup packages.
+RUN apt-get update && apt-get -y install cmake git build-essential vim python libncurses5-dev libedit-dev libpthread-stubs0-dev bison flex libboost-dev unzip python-pip && \
+pip install xattr pathlib2
+
+# Copy install-clang over.
+ADD . /opt/install-clang
+
+# Compile and install Clang/LLVM. We delete the source directory to
+# avoid committing it to the image.
+RUN /opt/install-clang/install-clang -j$(nproc) -C /opt/clang && git clone https://github.com/sslab-gatech/janus.git && \
+cd janus && cd ff-gcc && make && cd ../core && make && \
+cd ../lkl && ./compile -t btrfs -c && cd ../fs/btrfs && \
+make && cd istat && ./istat -i ../samples/evaluation/btrfs-00.image -t btrfs -o btrfs.istat && \
+mkdir prog && ./core/create_corpus istat/btrfs.istat prog  && \
+mkdir input output && ./core/afl-image-syscall/afl-fuzz -b btrfs -s fs/btrfs/btrfs_wrapper.so -e ./samples/evaluation/btrfs-00.image -S btrfs -y prog -i input -o output -m none -u 2 -- ./lkl/tools/lkl/btrfs-combined -t btrfs -p @@ && \
+echo core >/proc/sys/kernel/core_pattern
