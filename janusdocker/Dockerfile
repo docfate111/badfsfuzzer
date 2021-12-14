@@ -3,11 +3,8 @@ FROM rsmmr/clang:6.0
 # Setup environment.
 ENV PATH /opt/clang/bin:$PATH
 
-# Default command on startup.
-CMD bash
-
 # Setup packages.
-RUN apt-get update && apt-get install -y bc cmake git build-essential vim python libncurses5-dev libedit-dev libpthread-stubs0-dev bison flex libboost-dev unzip python-pip && \
+RUN apt update -y && apt-get install -y bc cmake git build-essential vim python libncurses5-dev libedit-dev libpthread-stubs0-dev bison flex libboost-dev unzip python-pip && \
 pip install xattr pathlib2
 
 # Copy install-clang over.
@@ -26,5 +23,7 @@ mkdir input output && \
 echo core >/proc/sys/kernel/core_pattern && \
 cd /sys/devices/system/cpu && \
 echo performance | tee cpu*/cpufreq/scaling_governor && \
-cd /janus && \
-./core/afl-image-syscall/afl-fuzz -b btrfs -s fs/btrfs/btrfs_wrapper.so -e ./samples/evaluation/btrfs-00.image -S btrfs -y prog -i input -o output -m none -u 2 -- ./lkl/tools/lkl/btrfs-combined -t btrfs -p @@ && \
+cd /janus
+#./core/afl-image-syscall/afl-fuzz -b btrfs -s fs/btrfs/btrfs_wrapper.so -e \
+#./samples/evaluation/btrfs-00.image -S btrfs -y prog -i input -o output -m none -u 2 \
+# -- ./lkl/tools/lkl/btrfs-combined -t btrfs -p @@
