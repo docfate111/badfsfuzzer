@@ -1,4 +1,4 @@
 linux
 linux/*
 fuzzer/target/*
-
+fuzzer/target
