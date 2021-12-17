@@ -150,7 +150,6 @@ static void activity(char *mpoint) {
 
   // rename
   lkl_sys_rename(foo_bar_baz, foo_baz);
-  
   // stat
   struct lkl_stat stat;
   memset(&stat, 0, sizeof(stat));
@@ -181,7 +180,6 @@ static void activity(char *mpoint) {
 
   // link
   lkl_sys_readlink(sln, buf2, sizeof(buf2));
-  
 }
 
 struct arg_struct {
@@ -213,7 +211,6 @@ void *fault_handler_thread(void *arg) {
       fprintf(stderr, "error read on userfaultfd!\n");
       _exit(1);
     }
-    
     unsigned long offset = (msg.arg.pagefault.address & ~(PAGE_SIZE - 1)) - base;
     uffdio_copy.src = (unsigned long)(buffer) + offset;
     uffdio_copy.dst = (unsigned long) msg.arg.pagefault.address & ~(PAGE_SIZE - 1);
@@ -230,9 +227,8 @@ void *userfault_init(void *image_buffer, size_t size) {
   pthread_t thr;
   struct uffdio_register uffdio_register;
   struct uffdio_api uffdio_api;
-  
   uffd = syscall(__NR_userfaultfd, O_CLOEXEC | O_NONBLOCK);
-  if (uffd == -1) 
+  if (uffd == -1)
     errExit("userfaultfd");
   uffdio_api.api = UFFD_API;
   uffdio_api.features = 0;
@@ -246,7 +242,7 @@ void *userfault_init(void *image_buffer, size_t size) {
   uffdio_register.range.start = (unsigned long) buffer;
   uffdio_register.range.len = len;
   uffdio_register.mode = UFFDIO_REGISTER_MODE_MISSING;
-  if (ioctl(uffd, UFFDIO_REGISTER, &uffdio_register) == -1) 
+  if (ioctl(uffd, UFFDIO_REGISTER, &uffdio_register) == -1)
     errExit("register uffd");
 
   static struct arg_struct args;
@@ -254,7 +250,7 @@ void *userfault_init(void *image_buffer, size_t size) {
   args.uffd = uffd;
   args.base = (unsigned long) buffer;
   int s = pthread_create(&thr, NULL, fault_handler_thread, (void *)(&args));
-  if (s != 0) 
+  if (s != 0)
     errExit("pthread_create");
 
   return buffer;
@@ -304,8 +300,8 @@ int main(int argc, char **argv)
   }
 
   disk.ops = NULL;
-  /*disk.buffer = userfault_init(image_buffer, size);
-  disk.capacity = size;*/
+  disk.buffer = userfault_init(image_buffer, size);
+  disk.capacity = size;
 
   ret = lkl_disk_add(&disk);
   if (ret < 0) {
