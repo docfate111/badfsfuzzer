@@ -1,12 +1,12 @@
 use memmap::{Mmap, MmapOptions};
-use std::env::{args, Args};
+use std::env::args;
 use std::fs::File;
+use std::io::prelude::*;
 const BTRFS_CSUM_SIZE: usize = 32;
 const BTRFS_LABEL_SIZE: usize = 256;
 const BTRFS_FSID_SIZE: usize = 16;
 const BTRFS_UUID_SIZE: usize = 16;
 const BTRFS_SYSTEM_CHUNK_ARRAY_SIZE: usize = 2048;
-
 
 const BTRFS_SUPERBLOCK_MAGIC: [u8; 8] = *b"_BHRfS_M";
 pub const BTRFS_FS_TREE_OBJECTID: u64 = 5;
@@ -127,14 +127,7 @@ pub struct BtrfsSuperblock {
     pub root_backups: [BtrfsRootBackup; 4],
 }
 
-fn map_to_file(args: &mut Args) -> Result<Mmap, &'static str> {
-    let filename = match args.nth(1) {
-        None => {
-            println!("Usage: ./fuzzer [filesystem image]");
-            return Err("invalid usage");
-        }
-        Some(value) => value,
-    };
+fn map_to_file(filename: &str) -> Result<Mmap, &'static str> {
     let file = match File::open(filename) {
         Err(_) => {
             return Err("opening file");
@@ -151,34 +144,46 @@ fn map_to_file(args: &mut Args) -> Result<Mmap, &'static str> {
     };
 }
 
-fn parse_block(memmapd: &Mmap) -> Vec<BtrfsSuperblock> {
+fn parse_block(file: &mut File, memmapd: &Mmap) {
     // find superblock
-    let mut offsets = Vec::<usize>::new();
     for i in (0..memmapd.len()).step_by(8) {
-        match memmapd.get(i..i+8) {
-            Some(v) => if v ==  BTRFS_SUPERBLOCK_MAGIC {
-                offsets.push(i);
-                println!("{:#01x}", i);
-            },
-            None => {continue;},
+        match memmapd.get(i..i + 8) {
+            Some(v) => {
+                if v == BTRFS_SUPERBLOCK_MAGIC {
+                    // write the superblock to the file
+                    println!("{:#01x}", i);
+                    //
+                    let start = i - 40;
+                    let superblock = match memmapd.get(start..start + 0xdcb) {
+                        Some(v) => {
+                            file.write_all(v);
+                        }
+                        None => {
+                            println!("Error finding superblock");
+                            continue;
+                        }
+                    };
+                }
+            }
+            None => {
+                continue;
+            }
         }
     }
-    let mut superblock: BtrfsSuperblock = unsafe { std::mem::zeroed() };
-    let superblock_size = std::mem::size_of::<BtrfsSuperblock>();
-    let mut superblocks = Vec::<BtrfsSuperblock>::new();
-    superblocks.push(superblock);
-    superblocks
 }
 
 fn main() -> Result<(), &'static str> {
-    let mut args: Args = args();
-    let memmapd = match map_to_file(&mut args) {
+    let filename = args().nth(1).expect("Usage: ./fuzzer [filesystem image]");
+    let memmapd = match map_to_file(&filename) {
         Err(s) => {
             return Err(s);
         }
         Ok(f) => f,
     };
-    parse_block(&memmapd);
+    let mut new_filename: String = filename.to_owned();
+    new_filename.push_str("-metadata");
+    let mut file = File::create(new_filename).expect("Error creating file");
+    parse_block(&mut file, &memmapd);
     Ok(())
 }
 /*
