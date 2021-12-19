@@ -1,12 +1,14 @@
+use memmap::{Mmap, MmapOptions};
 use std::env::{args, Args};
 use std::fs::File;
-use memmap::{Mmap, MmapOptions};
 const BTRFS_CSUM_SIZE: usize = 32;
 const BTRFS_LABEL_SIZE: usize = 256;
 const BTRFS_FSID_SIZE: usize = 16;
 const BTRFS_UUID_SIZE: usize = 16;
 const BTRFS_SYSTEM_CHUNK_ARRAY_SIZE: usize = 2048;
 
+
+const BTRFS_SUPERBLOCK_MAGIC: [u8; 8] = *b"_BHRfS_M";
 pub const BTRFS_FS_TREE_OBJECTID: u64 = 5;
 
 pub const BTRFS_INODE_REF_KEY: u8 = 12;
@@ -128,9 +130,9 @@ pub struct BtrfsSuperblock {
 fn map_to_file(args: &mut Args) -> Result<Mmap, &'static str> {
     let filename = match args.nth(1) {
         None => {
-                println!("Usage: ./fuzzer [filesystem image]");
-                return Err("invalid usage");
-        },
+            println!("Usage: ./fuzzer [filesystem image]");
+            return Err("invalid usage");
+        }
         Some(value) => value,
     };
     let file = match File::open(filename) {
@@ -143,18 +145,40 @@ fn map_to_file(args: &mut Args) -> Result<Mmap, &'static str> {
         match MmapOptions::new().map(&file) {
             Err(_) => {
                 return Err("mmap error");
-            },
+            }
             Ok(f) => Ok(f),
         }
     };
 }
 
+fn parse_block(memmapd: &Mmap) -> Vec<BtrfsSuperblock> {
+    // find superblock
+    let mut offsets = Vec::<usize>::new();
+    for i in (0..memmapd.len()).step_by(8) {
+        match memmapd.get(i..i+8) {
+            Some(v) => if v ==  BTRFS_SUPERBLOCK_MAGIC {
+                offsets.push(i);
+                println!("{:#01x}", i);
+            },
+            None => {continue;},
+        }
+    }
+    let mut superblock: BtrfsSuperblock = unsafe { std::mem::zeroed() };
+    let superblock_size = std::mem::size_of::<BtrfsSuperblock>();
+    let mut superblocks = Vec::<BtrfsSuperblock>::new();
+    superblocks.push(superblock);
+    superblocks
+}
+
 fn main() -> Result<(), &'static str> {
     let mut args: Args = args();
     let memmapd = match map_to_file(&mut args) {
-        Err(s) => { return Err(s); },
+        Err(s) => {
+            return Err(s);
+        }
         Ok(f) => f,
     };
+    parse_block(&memmapd);
     Ok(())
 }
 /*
