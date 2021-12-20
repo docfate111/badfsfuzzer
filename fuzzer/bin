@@ -195,12 +195,18 @@ fn main() -> Result<(), &'static str> {
         }
         Ok(f) => f,
     };
+    
+    // extract superblock
+    let superblocks = parse_block(&memmapd);
+    
+    // generate corpus
+
 
     let mut state = StdState::new(
         // RNG
         StdRand::with_seed(current_nanos()),
         // corpus that will be evolved, in memory for performance
-        InMemoryCorpus::<BytesInput>::new(),
+        corpus,
         // Corpus to store crashes
         OnDiskCorpus::<BytesInput>::new(PathBuf::from("./crashes")).unwrap(),
         (),
@@ -216,8 +222,6 @@ fn main() -> Result<(), &'static str> {
         }
     };
 
-    // extract superblock
-    let superblocks = parse_block(&memmapd);
     // fuzz the extracted block
     let mut mutator = StdScheduledMutator::new(havoc_mutations());
     let mut bytes_to_mutate = Vec::<u8>::new();
