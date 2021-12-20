@@ -1,7 +1,19 @@
+use libafl::{
+    bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
+    corpus::{InMemoryCorpus, OnDiskCorpus},
+    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
+    fuzzer::StdFuzzer,
+    inputs::BytesInput,
+    mutators::{havoc_mutations, Mutator, StdScheduledMutator},
+    observers::StdMapObserver,
+    state::StdState,
+};
 use memmap::{Mmap, MmapOptions};
 use std::env::args;
+use std::fs;
 use std::fs::File;
-use std::io::prelude::*;
+use std::path::PathBuf;
+//use std::io::prelude::*;
 const BTRFS_CSUM_SIZE: usize = 32;
 const BTRFS_LABEL_SIZE: usize = 256;
 const BTRFS_FSID_SIZE: usize = 16;
@@ -144,19 +156,19 @@ fn map_to_file(filename: &str) -> Result<Mmap, &'static str> {
     };
 }
 
-fn parse_block(file: &mut File, memmapd: &Mmap) {
+fn parse_block(memmapd: &Mmap) -> Vec<&[u8]> {
     // find superblock
+    let mut superblocks = Vec::<&[u8]>::new();
     for i in (0..memmapd.len()).step_by(8) {
         match memmapd.get(i..i + 8) {
             Some(v) => {
                 if v == BTRFS_SUPERBLOCK_MAGIC {
                     // write the superblock to the file
-                    println!("{:#01x}", i);
-                    //
+                    println!("found magic btrfs header at {:#01x}", i);
                     let start = i - 40;
-                    let superblock = match memmapd.get(start..start + 0xdcb) {
-                        Some(v) => {
-                            file.write_all(v);
+                    match memmapd.get(start..start + 0xdcb) {
+                        Some(block) => {
+                            superblocks.push(block);
                         }
                         None => {
                             println!("Error finding superblock");
@@ -170,7 +182,10 @@ fn parse_block(file: &mut File, memmapd: &Mmap) {
             }
         }
     }
+    superblocks
 }
+
+/// Coverage map with explicit assignments due to the lack of instrumentation
 
 fn main() -> Result<(), &'static str> {
     let filename = args().nth(1).expect("Usage: ./fuzzer [filesystem image]");
@@ -180,179 +195,50 @@ fn main() -> Result<(), &'static str> {
         }
         Ok(f) => f,
     };
+
+    let mut state = StdState::new(
+        // RNG
+        StdRand::with_seed(current_nanos()),
+        // corpus that will be evolved, in memory for performance
+        InMemoryCorpus::<BytesInput>::new(),
+        // Corpus to store crashes
+        OnDiskCorpus::<BytesInput>::new(PathBuf::from("./crashes")).unwrap(),
+        (),
+    );
+
+    // copy the disk image
     let mut new_filename: String = filename.to_owned();
-    new_filename.push_str("-metadata");
-    let mut file = File::create(new_filename).expect("Error creating file");
-    parse_block(&mut file, &memmapd);
+    new_filename.push_str("-mutated");
+    let _ = match fs::copy(filename, new_filename) {
+        Ok(v) => v,
+        Err(_) => {
+            return Err("Error copying disk image");
+        }
+    };
+
+    // extract superblock
+    let superblocks = parse_block(&memmapd);
+    // fuzz the extracted block
+    let mut mutator = StdScheduledMutator::new(havoc_mutations());
+    let mut bytes_to_mutate = Vec::<u8>::new();
+    for block in superblocks {
+        for b in block {
+            bytes_to_mutate.push(*b);
+        }
+        let mut input = BytesInput::new(bytes_to_mutate.clone());
+        match mutator.mutate(&mut state, &mut input, -1) {
+            Ok(_) => {
+                println!("{:?}", input);
+                continue;
+            }
+            Err(x) => {
+                println!("Error mutating {:?}", x);
+            }
+        }
+    }
+    // generate a new checksum for each inserted superblock
+    // place the mutated blocks into the copied disk image
+    // mount the disk image
+    // do file system operations on the disk image
     Ok(())
 }
-/*
-#[repr(C, packed)]
-#[derive(Copy, Clone)]
-pub struct BtrfsStripe {
-    pub devid: u64,
-    pub offset: u64,
-    pub dev_uuid: [u8; BTRFS_UUID_SIZE],
-}
-
-#[repr(C, packed)]
-#[derive(Copy, Clone)]
-pub struct BtrfsChunk {
-    /// size of this chunk in bytes
-    pub length: u64,
-    /// objectid of the root referencing this chunk
-    pub owner: u64,
-    pub stripe_len: u64,
-    pub ty: u64,
-    /// optimal io alignment for this chunk
-    pub io_align: u32,
-    /// optimal io width for this chunk
-    pub io_width: u32,
-    /// minimal io size for this chunk
-    pub sector_size: u32,
-    /// 2^16 stripes is quite a lot, a second limit is the size of a single item in the btree
-    pub num_stripes: u16,
-    /// sub stripes only matter for raid10
-    pub sub_stripes: u16,
-    pub stripe: BtrfsStripe,
-    // additional stripes go here
-}
-
-#[repr(C, packed)]
-#[derive(Copy, Clone)]
-pub struct BtrfsTimespec {
-    pub sec: u64,
-    pub nsec: u32,
-}
-
-#[repr(C, packed)]
-#[derive(Copy, Clone)]
-pub struct BtrfsInodeItem {
-    /// nfs style generation number
-    pub generation: u64,
-    /// transid that last touched this inode
-    pub transid: u64,
-    pub size: u64,
-    pub nbytes: u64,
-    pub block_group: u64,
-    pub nlink: u32,
-    pub uid: u32,
-    pub gid: u32,
-    pub mode: u32,
-    pub rdev: u64,
-    pub flags: u64,
-    /// modification sequence number for NFS
-    pub sequence: u64,
-    pub reserved: [u64; 4],
-    pub atime: BtrfsTimespec,
-    pub ctime: BtrfsTimespec,
-    pub mtime: BtrfsTimespec,
-    pub otime: BtrfsTimespec,
-}
-
-#[repr(C, packed)]
-#[derive(Copy, Clone)]
-pub struct BtrfsRootItem {
-    pub inode: BtrfsInodeItem,
-    pub generation: u64,
-    pub root_dirid: u64,
-    pub bytenr: u64,
-    pub byte_limit: u64,
-    pub bytes_used: u64,
-    pub last_snapshot: u64,
-    pub flags: u64,
-    pub refs: u32,
-    pub drop_progress: BtrfsKey,
-    pub drop_level: u8,
-    pub level: u8,
-    pub generation_v2: u64,
-    pub uuid: [u8; BTRFS_UUID_SIZE],
-    pub parent_uuid: [u8; BTRFS_UUID_SIZE],
-    pub received_uuid: [u8; BTRFS_UUID_SIZE],
-    /// updated when an inode changes
-    pub ctransid: u64,
-    /// trans when created
-    pub otransid: u64,
-    /// trans when sent. non-zero for received subvol
-    pub stransid: u64,
-    /// trans when received. non-zero for received subvol
-    pub rtransid: u64,
-    pub ctime: BtrfsTimespec,
-    pub otime: BtrfsTimespec,
-    pub stime: BtrfsTimespec,
-    pub rtime: BtrfsTimespec,
-    pub reserved: [u64; 8],
-}
-
-#[repr(C, packed)]
-#[derive(Copy, Clone)]
-pub struct BtrfsDirItem {
-    pub location: BtrfsKey,
-    pub transid: u64,
-    pub data_len: u16,
-    pub name_len: u16,
-    pub ty: u8,
-}
-
-#[repr(C, packed)]
-#[derive(Copy, Clone)]
-pub struct BtrfsInodeRef {
-    pub index: u64,
-    pub name_len: u16,
-}
-
-#[repr(C, packed)]
-#[derive(Copy, Clone)]
-pub struct BtrfsKey {
-    pub objectid: u64,
-    pub ty: u8,
-    pub offset: u64,
-}
-
-#[repr(C, packed)]
-#[derive(Copy, Clone)]
-pub struct BtrfsHeader {
-    pub csum: [u8; BTRFS_CSUM_SIZE],
-    pub fsid: [u8; BTRFS_FSID_SIZE],
-    /// Which block this node is supposed to live in
-    pub bytenr: u64,
-    pub flags: u64,
-    pub chunk_tree_uuid: [u8; BTRFS_UUID_SIZE],
-    pub generation: u64,
-    pub owner: u64,
-    pub nritems: u32,
-    pub level: u8,
-}
-
-#[repr(C, packed)]
-#[derive(Copy, Clone)]
-/// A `BtrfsLeaf` is full of `BtrfsItem`s. `offset` and `size` (relative to start of data area)
-/// tell us where to find the item in the leaf.
-pub struct BtrfsItem {
-    pub key: BtrfsKey,
-    pub offset: u32,
-    pub size: u32,
-}
-
-#[repr(C, packed)]
-#[derive(Copy, Clone)]
-pub struct BtrfsLeaf {
-    pub header: BtrfsHeader,
-    // `BtrfsItem`s begin here
-}
-
-#[repr(C, packed)]
-#[derive(Copy, Clone)]
-/// All non-leaf blocks are nodes and they hold only keys are pointers to other blocks
-pub struct BtrfsKeyPtr {
-    pub key: BtrfsKey,
-    pub blockptr: u64,
-    pub generation: u64,
-}
-
-#[repr(C, packed)]
-#[derive(Copy, Clone)]
-pub struct BtrfsNode {
-    pub header: BtrfsHeader,
-    // `BtrfsKeyPtr`s begin here
-}*/
