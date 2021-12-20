@@ -5,3 +5,7 @@ fuzzer/target
 *swp*
 *img*
 crashes
+src/compress/target
+src/compress/target/*
+src/btrfs-parse/target
+src/btrfs-parse/target/*
