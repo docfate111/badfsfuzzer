@@ -9,3 +9,4 @@ src/compress/target
 src/compress/target/*
 src/btrfs-parse/target
 src/btrfs-parse/target/*
+*.o
