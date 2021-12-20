@@ -10,11 +10,11 @@ use libafl::{
 };
 use std::env::args;
 use std::path::PathBuf;
-use btrfs_parse;
+use btrfs_parse::btrfs_parse::*;
 
 fn main() -> Result<(), &'static str> {
     let filename = args().nth(1).expect("Usage: ./fuzzer [filesystem image]");
-    println!("{:?}", btrfs_parse::btrfs_parse::BTRFS_SUPERBLOCK_MAGIC);
+    println!("{:?}", BTRFS_SUPERBLOCK_MAGIC);
     /*let mut corpus = InMemoryCorpus::<BytesInput>::new();
 
     let mut state = StdState::new(
