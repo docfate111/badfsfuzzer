@@ -3,4 +3,5 @@ linux/*
 fuzzer/target/*
 fuzzer/target
 *swp*
-*img
+*img*
+crashes
