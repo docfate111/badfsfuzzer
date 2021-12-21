@@ -1,3 +1,4 @@
+use fs_parse::btrfs_parse::*;
 use libafl::{
     bolts::{current_nanos, rands::StdRand},
     corpus::{InMemoryCorpus, OnDiskCorpus},
@@ -10,11 +11,20 @@ use libafl::{
 };
 use std::env::args;
 use std::path::PathBuf;
-use btrfs_parse::btrfs_parse::*;
 
 fn main() -> Result<(), &'static str> {
     let filename = args().nth(1).expect("Usage: ./fuzzer [filesystem image]");
-    println!("{:?}", BTRFS_SUPERBLOCK_MAGIC);
+    let original = filename.clone();
+    let mut new_file: String = filename.to_owned();
+    new_file.push_str("-metadata");
+    match extract(&original, &new_file) {
+        Ok(_) => {
+            return Ok(());
+        }
+        Err(_) => {
+            return Err("Error extracting superblock");
+        }
+    }
     /*let mut corpus = InMemoryCorpus::<BytesInput>::new();
 
     let mut state = StdState::new(
@@ -28,14 +38,6 @@ fn main() -> Result<(), &'static str> {
     );
 
     // copy the disk image
-    let mut new_filename: String = filename.to_owned();
-    new_filename.push_str("-mutated");
-    let _ = match fs::copy(filename, new_filename) {
-        Ok(v) => v,
-        Err(_) => {
-            return Err("Error copying disk image");
-        }
-    };
 
     // extract superblock
     // let superblocks = parse_block(&memmapd);
@@ -61,5 +63,4 @@ fn main() -> Result<(), &'static str> {
     // mount the disk image
     // do file system operations on the disk image
     */
-    Ok(())
 }

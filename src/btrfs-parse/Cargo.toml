@@ -1,5 +1,5 @@
 [package]
-name = "btrfs-parse"
+name = "fs_parse"
 version = "0.1.0"
 edition = "2021"
 
