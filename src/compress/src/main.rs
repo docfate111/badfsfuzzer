@@ -1,4 +1,3 @@
-use fs_parse::btrfs_parse::*;
 use libafl::{
     bolts::{current_nanos, rands::StdRand},
     corpus::{InMemoryCorpus, OnDiskCorpus},
@@ -11,6 +10,7 @@ use libafl::{
 };
 use std::env::args;
 use std::path::PathBuf;
+use fs_parse::btrfs_parse::*;
 
 fn main() -> Result<(), &'static str> {
     let filename = args().nth(1).expect("Usage: ./fuzzer [filesystem image]");
@@ -18,15 +18,11 @@ fn main() -> Result<(), &'static str> {
     let mut new_file: String = filename.to_owned();
     new_file.push_str("-metadata");
     match extract(&original, &new_file) {
-        Ok(_) => {
-            return Ok(());
-        }
-        Err(_) => {
-            return Err("Error extracting superblock");
-        }
+        Ok(_) => { },
+        Err(_) => { return Err("Error extracting superblock"); },
     }
-    /*let mut corpus = InMemoryCorpus::<BytesInput>::new();
-
+    let mut corpus = OnDiskCorpus::<BytesInput>::new(
+        PathBuf::from("./crashes")).unwrap();
     let mut state = StdState::new(
         // RNG
         StdRand::with_seed(current_nanos()),
@@ -36,7 +32,7 @@ fn main() -> Result<(), &'static str> {
         OnDiskCorpus::<BytesInput>::new(PathBuf::from("./crashes")).unwrap(),
         (),
     );
-
+    /*
     // copy the disk image
 
     // extract superblock
@@ -63,4 +59,5 @@ fn main() -> Result<(), &'static str> {
     // mount the disk image
     // do file system operations on the disk image
     */
+    Ok(())
 }

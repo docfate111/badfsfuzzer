@@ -10,3 +10,5 @@ src/compress/target/*
 src/btrfs-parse/target
 src/btrfs-parse/target/*
 *.o
+src/compress/corpus
+src/compress/corpus/*
