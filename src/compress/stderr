@@ -1,0 +1,46 @@
+warning: unused variable: `s`
+  --> /home/t/badfsfuzzer/src/btrfs-parse/src/lib.rs:82:21
+   |
+82 |                 Err(s) => {
+   |                     ^ help: if this is intentional, prefix it with an underscore: `_s`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: unused `Result` that must be used
+  --> /home/t/badfsfuzzer/src/btrfs-parse/src/lib.rs:37:33
+   |
+37 | ...                   out.write(block);
+   |                       ^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_must_use)]` on by default
+   = note: this `Result` may be an `Err` variant, which should be handled
+
+warning: `fs_parse` (lib) generated 2 warnings
+warning: unused imports: `CrashFeedback`, `InMemoryCorpus`, `MapFeedbackState`, `MaxMapFeedback`, `fuzzer::StdFuzzer`, `observers::StdMapObserver`
+ --> src/main.rs:4:14
+  |
+4 |     corpus::{InMemoryCorpus, OnDiskCorpus},
+  |              ^^^^^^^^^^^^^^
+5 |     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
+  |                 ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+6 |     fuzzer::StdFuzzer,
+  |     ^^^^^^^^^^^^^^^^^
+...
+9 |     observers::StdMapObserver,
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: variable does not need to be mutable
+  --> src/main.rs:39:9
+   |
+39 |     let mut bytes_to_mutate =
+   |         ----^^^^^^^^^^^^^^^
+   |         |
+   |         help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` on by default
+
+warning: `fuzzer` (bin "fuzzer") generated 2 warnings
+    Finished dev [unoptimized + debuginfo] target(s) in 0.10s
+     Running `target/debug/fuzzer example.img`
